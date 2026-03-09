@@ -75,17 +75,30 @@ function App() {
   };
 
   // Utilidad para extraer URLs (El backend guarda paso a paso: "step_url,stl_url")
+  const toAbsoluteUrl = (rawUrl: string) => {
+    const cleaned = rawUrl.trim();
+    if (!cleaned) return '';
+    if (/^https?:\/\//i.test(cleaned)) return cleaned;
+    if (cleaned.startsWith('/')) return `${API_BASE}${cleaned}`;
+    return `${API_BASE}/${cleaned}`;
+  };
+
   const getUrls = (file_url: string | null) => {
     if (!file_url) return { stepUrl: '', stlUrl: '' };
+    
     const urls = file_url.split(',');
-    // Asumimos el orden que devuelve ai_engine.py: STEP, STL
-    const stepUrl = urls.find(u => u.endsWith('.step')) || urls[0];
-    const stlUrl = urls.find(u => u.endsWith('.stl')) || urls[1];
+    
+    // Usamos .includes() para ignorar los query params de las URLs firmadas
+    const stepUrl = urls.find(u => u.includes('.step')) || urls[0];
+    const stlUrl = urls.find(u => u.includes('.stl')) || urls[1] || urls[0];
+    
     return { stepUrl, stlUrl };
   };
 
   const activeJob = currentJob;
   const { stepUrl, stlUrl } = getUrls(activeJob?.file_url || null);
+  const resolvedStepUrl = toAbsoluteUrl(stepUrl);
+  const resolvedStlUrl = toAbsoluteUrl(stlUrl);
 
   return (
     <div className="min-h-screen max-w-5xl mx-auto p-6 flex flex-col gap-8 font-sans text-gray-800">
@@ -138,12 +151,12 @@ function App() {
               <p className="text-red-500">Ocurrió un error al generar el modelo. Intenta con otro prompt.</p>
             )}
 
-            {activeJob.status === 'completed' && stlUrl && (
+            {activeJob.status === 'completed' && resolvedStlUrl && (
               <div className="w-full flex flex-col gap-4">
-                <ModelViewer stlUrl={stlUrl} />
+                <ModelViewer stlUrl={resolvedStlUrl} />
                 <div className="flex justify-center gap-4">
                   <a
-                    href={stlUrl}
+                    href={resolvedStlUrl}
                     download
                     target="_blank"
                     rel="noreferrer"
@@ -152,7 +165,7 @@ function App() {
                     Descargar STL
                   </a>
                   <a
-                    href={stepUrl}
+                    href={resolvedStepUrl}
                     download
                     target="_blank"
                     rel="noreferrer"
