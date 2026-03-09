@@ -26,6 +26,19 @@ function App() {
     }
   };
 
+  const handleOpenHistoryJob = async (job: JobStatusResponse) => {
+    setError('');
+    setCurrentJob(job);
+
+    try {
+      const res = await axios.get(`${API_BASE}/jobs/${job.job_id}`);
+      setCurrentJob(res.data);
+    } catch (err) {
+      console.error('Error cargando detalle del trabajo', err);
+      setError('No se pudo abrir el detalle completo del trabajo seleccionado.');
+    }
+  };
+
   // Lógica de Polling
   useEffect(() => {
     let interval: number;
@@ -78,7 +91,22 @@ function App() {
   const toAbsoluteUrl = (rawUrl: string) => {
     const cleaned = rawUrl.trim();
     if (!cleaned) return '';
-    if (/^https?:\/\//i.test(cleaned)) return cleaned;
+
+    if (/^https?:\/\//i.test(cleaned)) {
+      try {
+        const parsed = new URL(cleaned);
+
+        // Si el backend devolvió host interno de Docker (ej: minio), lo adaptamos al host del navegador.
+        if (['minio', 'backend', 'api'].includes(parsed.hostname)) {
+          parsed.hostname = window.location.hostname;
+        }
+
+        return parsed.toString();
+      } catch {
+        return cleaned;
+      }
+    }
+
     if (cleaned.startsWith('/')) return `${API_BASE}${cleaned}`;
     return `${API_BASE}/${cleaned}`;
   };
@@ -135,6 +163,11 @@ function App() {
         {activeJob && (
           <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center">
             <h2 className="text-lg font-semibold w-full mb-4">Resultado</h2>
+
+            <div className="w-full mb-4 p-3 rounded-lg border border-indigo-100 bg-indigo-50">
+              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Consigna usada</p>
+              <p className="text-sm text-gray-800 mt-1 whitespace-pre-wrap">{activeJob.prompt}</p>
+            </div>
             
             {activeJob.status === 'pending' && (
               <p className="text-gray-500 animate-pulse">En cola, esperando disponibilidad...</p>
@@ -187,7 +220,7 @@ function App() {
               {history.map((job) => (
                 <div 
                   key={job.job_id} 
-                  onClick={() => setCurrentJob(job)}
+                  onClick={() => handleOpenHistoryJob(job)}
                   className="p-4 bg-white border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all"
                 >
                   <p className="text-sm font-medium text-gray-800 line-clamp-2 mb-2">
